@@ -1,0 +1,15 @@
+[package]
+name = "fuzz"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ieee-apsqrt = {path = ".."}
+clap = {version = "4.4.2", features = ["derive", "wrap_help"]}
+liso = "1.1.1"
+num_cpus = "1.16.0"
+parking_lot = "0.12.1"
+rand = "0.8.5"
+rustc_apfloat = "0.2.0"
