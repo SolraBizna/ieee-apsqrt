@@ -42,8 +42,8 @@ mod privacy_hack {
         type Semantics: rustc_apfloat::ieee::Semantics;
         fn ilog2(bits: &Self::Bits) -> u16;
         fn get_exponent(bits: &Self::Bits) -> i16 {
-            (*bits >> ((Self::Semantics::PRECISION-1) as i32))
-                .into() as i16 - Self::EXPONENT_BIAS
+            ((*bits >> ((Self::Semantics::PRECISION-1) as i32))
+                .into() as u128 & (0xFFFF>>(16-(Self::Float::BITS - Self::Float::PRECISION)))) as i16 - Self::EXPONENT_BIAS
         }
         // these only work if we don't borrow/carry through the sign bit...
         // we will only be calling these on numbers that have plenty of
@@ -184,7 +184,7 @@ mod privacy_hack {
     }
     pub struct WideDoubleS;
     impl Semantics for WideDoubleS {
-        const BITS: usize = 64 + DoubleS::PRECISION;
+        const BITS: usize = 64 + DoubleS::PRECISION + 3;
         const EXP_BITS: usize = DoubleS::EXP_BITS;
     }
     pub struct Wide64;
@@ -219,7 +219,7 @@ mod privacy_hack {
     }
     pub struct WideSingleS;
     impl Semantics for WideSingleS {
-        const BITS: usize = 32 + SingleS::PRECISION;
+        const BITS: usize = 32 + SingleS::PRECISION + 3;
         const EXP_BITS: usize = SingleS::EXP_BITS;
     }
     pub struct Wide32;
@@ -290,10 +290,6 @@ fn inner_bad_sqrt<B:InnerFloatRepr>(square: B::Bits, round_mode: Round) -> Resul
         if new_estimate_f == estimate_f {
             // not getting any more precise, baby
             break false
-        } else if new_estimate_f.next_up().value == estimate_f {
-            break false
-        } else if new_estimate_f == estimate_f.next_up().value {
-            break false
         } else {
             estimate_f = new_estimate_f;
         }
@@ -316,11 +312,6 @@ fn defined_cases<B:FloatRepr>(square: B::Bits) -> Option<(StatusAnd<B::Bits>, u3
             status: Status::OK,
             value: !(B::MAX>>1), // sqrt(-0) = -0
         }, 0))
-    } else if square & !(B::MAX>>1) != B::ZERO {
-        Some((StatusAnd {
-            status: Status::INVALID_OP,
-            value: B::CANON_NAN, // sqrt(-x) = NaN
-        }, 0))
     } else if square == B::INFINITY {
         // square root of infinity is infinity
         Some((StatusAnd {
@@ -328,10 +319,16 @@ fn defined_cases<B:FloatRepr>(square: B::Bits) -> Option<(StatusAnd<B::Bits>, u3
             value: B::INFINITY,
         }, 0))
     } else if B::get_exponent(&square) > B::MAX_EXPONENT {
+        let is_quiet = (square >> (B::Semantics::PRECISION-2) as i32) & B::ONE != B::ZERO;
         // square root of NaN is NaN
         Some((StatusAnd {
-            status: Status::INVALID_OP,
+            status: if is_quiet { Status::OK } else { Status::INVALID_OP },
             value: B::CANON_NAN,
+        }, 0))
+    } else if square & !(B::MAX>>1) != B::ZERO {
+        Some((StatusAnd {
+            status: Status::INVALID_OP,
+            value: B::CANON_NAN, // sqrt(-x) = NaN
         }, 0))
     } else { None }
 }
@@ -482,15 +479,18 @@ mod tests {
     }
     #[test]
     fn fuzz_data() {
-        const TEST_CASES: &[(u32, u32)] = &[
-            (0x527FFFFF, 0x48FFFFFF),
-            (0x3D800001, 0x3E800000),
-            (0x420CC23D, 0x40BDD3AD),
-            (0x7F7E578B, 0x5F7F2B6D),
+        const TEST_CASES: &[(u32, Round, u32)] = &[
+            (0x527FFFFF, Round::NearestTiesToEven, 0x48FFFFFF),
+            (0x3D800001, Round::NearestTiesToEven, 0x3E800000),
+            (0x420CC23D, Round::NearestTiesToEven, 0x40BDD3AD),
+            (0x7F7E578B, Round::NearestTiesToEven, 0x5F7F2B6D),
+            (0x7F7FFFFF, Round::NearestTiesToEven, 0x5F7FFFFF),
+            (0x7F7FFFFF, Round::NearestTiesToAway, 0x5F7FFFFF),
+            (0x7F7FFFFF, Round::TowardPositive, 0x5F800000),
         ];
         let mut ok = true;
-        for (question, answer) in TEST_CASES.iter() {
-            let (result, _iterations) = sqrt_accurate(*question, Round::NearestTiesToEven);
+        for (question, round, answer) in TEST_CASES.iter() {
+            let (result, _iterations) = sqrt_accurate(*question, *round);
             if *answer == result.value {
                 println!("{:08X} = {:08X} RIGHT", question, result.value);
             } else {

@@ -1,6 +1,6 @@
 [package]
 name = "ieee-apsqrt"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Square root functions for IEEE floats using rustc_apfloat"
 license = "Apache-2.0 WITH LLVM-exception"
