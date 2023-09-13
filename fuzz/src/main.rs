@@ -73,7 +73,7 @@ fn $name(results: &mut TrialResults) {
     }
     let native_sqrt = (($f::from_bits(bits) as f64).sqrt() as $f).to_bits();
     //println!(format!("{:X} -> {:X}", bits, native_sqrt));
-    let (evil_sqrt, iterations) = ieee_apsqrt::$inner::<ieee_apsqrt::BadEstimator, $u>(bits, Round::NearestTiesToEven);
+    let (evil_sqrt, iterations) = ieee_apsqrt::$inner::<$u>(bits, Round::NearestTiesToEven);
     results.trials += 1;
     results.$trials += 1;
     if evil_sqrt.status == Status::OK {
@@ -107,10 +107,10 @@ fn $name(results: &mut TrialResults) {
     results.$total_iterations += iterations as u64;
 }}}
 
-make_attempt!(make_attempt_32_slower, bad_sqrt_slower, 0, u32, f32, "f32", trials_f32, total_iterations_f32);
-make_attempt!(make_attempt_64_slower, bad_sqrt_slower, 0, u64, f64, "f64", trials_f64, total_iterations_f64);
-make_attempt!(make_attempt_32_slow, bad_sqrt_slow, 2, u32, f32, "f32", trials_f32, total_iterations_f32);
-make_attempt!(make_attempt_64_slow, bad_sqrt_slow, 2, u64, f64, "f64", trials_f64, total_iterations_f64);
+make_attempt!(make_attempt_32_slower, sqrt_accurate, 0, u32, f32, "f32", trials_f32, total_iterations_f32);
+make_attempt!(make_attempt_64_slower, sqrt_accurate, 0, u64, f64, "f64", trials_f64, total_iterations_f64);
+make_attempt!(make_attempt_32_slow, sqrt_fast, 2, u32, f32, "f32", trials_f32, total_iterations_f32);
+make_attempt!(make_attempt_64_slow, sqrt_fast, 2, u64, f64, "f64", trials_f64, total_iterations_f64);
 
 #[derive(Debug, Parser)]
 #[clap(about, author)]
